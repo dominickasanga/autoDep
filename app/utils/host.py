@@ -46,6 +46,10 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
         if isinstance(client, AsyncParamikoSSHClient):
             try:
                 await client.clsConnect()
+                if client.is_connected() == False:
+                    client.close()
+                    return 
+                
                 print_status('success', f"Connected to host: {ip_address}")
 
                 print_stage("PROCESSING APPLICATIONS")
