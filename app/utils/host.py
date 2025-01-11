@@ -19,7 +19,7 @@ password_list = [password.replace("'", "").strip("")
 
 async def update_remote_host(user_name: str, ip_address: str) -> str:
     try:
-        client = await check_if_password_works(ip_address, user_name)
+        client = await conect_to_remote_host(ip_address, user_name)
         app_dirs = os.getenv('APP_DIRS').split(',')
         collection = []
         output_cache = []
@@ -29,6 +29,7 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
         if isinstance(client,AsyncParamikoSSHClient):
             try:
                 await client.clsConnect()
+                print("connection successfull to host: ", ip_address)
 
                 for app_dir in app_dirs:
                     git_pull_cmd = f"cd {app_dir} && git pull --tags http://{os.getenv('GIT_HOST')}:{generate_git_url(app_dir)}"
@@ -202,19 +203,36 @@ async def check_if_password_works(remote_host, ssh_username):
     redisPassword = await redisInstance.getPswrd(remote_host)
 
     # Use Redis password if available, otherwise iterate through password list
+    _PASSWORDS_ = os.getenv('PASSWORDS')
+    passwords = _PASSWORDS_.split(',')
+
+    # Step 1: Remove unwanted characters (square brackets and single quotes) from the passwords
+    password_list = [password.strip("['").strip("']") for password in passwords]
+    password_list = [password.replace("'", "").strip("")
+                    for password in password_list]
     passwords_to_try = [redisPassword] if redisPassword else password_list
 
     for password in passwords_to_try:
         try:
-            client = AsyncParamikoSSHClient(host=remote_host, username=ssh_username,
-                    password=str(password).strip())
-            
-            await client.clsConnect()
+            client = AsyncParamikoSSHClient(host=remote_host, username=ssh_username)
+            await client.clsConnectWithPass(password=str(password).strip())
             await redisInstance.updatePswrdDict(remote_host, str(password).strip())
-            return client
+            
+            return str(password).strip()
         except paramiko.SSHException as e:
             print("Unable to establish SSH connection:", str(e))
         except Exception as e:
             print(e)
         finally:
             client.close()
+
+# retuns AsyncParamikoSSHClient instance
+async def conect_to_remote_host(remote_host, ssh_username):
+    try:
+        client = AsyncParamikoSSHClient(host=remote_host, username=ssh_username)
+        await client.clsConnect()
+        return client
+    except paramiko.SSHException as e:
+        print("Unable to establish SSH connection:", str(e))
+    except Exception as e:
+        print("conect to remote host error:", str(e))
