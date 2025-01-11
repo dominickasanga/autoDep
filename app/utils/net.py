@@ -8,23 +8,24 @@ from redis.asyncio import Redis
 from utils import xi
 import colorama
 from colorama import Fore, Style
+import socket
+import re
+from dotenv import load_dotenv
+load_dotenv()
 
-def host_is_reachable(ip_address: str) -> bool:
-    """checks if remote host is reachable
-
-        Args:
-            ip_address (str): ip address of remote server
-
-        Returns:
-            bool: True if remote host is reachable, False otherwise
-        """
-
-    param = '-n' if platform.system().lower() == 'windows' else '-c'
-
-    if subprocess.call(['ping', param, '1', ip_address]) != 0:
+def host_is_reachable(ip_address, port=22):
+    sock = None
+    try:
+        # Create a socket object
+        sock = socket.create_connection((ip_address, port), timeout=5)
+        sock.close()
+        return True
+    except (socket.timeout, ConnectionRefusedError):
         return False
-
-    return True
+    except Exception as e:
+        if sock:
+            sock.close()
+        raise e
 
 
 class AsyncParamikoSSHClient(paramiko.SSHClient):
@@ -139,6 +140,17 @@ class AsyncParamikoSSHClient(paramiko.SSHClient):
     async def custom_open_sftp(self):
         channel = self.open_sftp()
         return channel
+
+    async def send_command_for_paths(self, command):
+        channel = self.exec_command(command)
+        stdin, stdout, stderr = channel
+        decoded_stderr = stderr.read().decode("utf-8")  # Decode the stdout bytes into a string
+        if decoded_stderr:
+            # return f"ERRor:\n{decoded_stderr}"
+            True
+        output = stdout.read()
+        # self.close()
+        return output
 
     async def receive_command(self, command):
         channel = await self.open_channel('session')
