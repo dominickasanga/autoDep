@@ -6,6 +6,9 @@ from time import sleep
 from dotenv import load_dotenv
 from utils import imp_exp_func, file_operations, xi
 from transpoter import update_host
+from concurrent.futures import ProcessPoolExecutor
+import asyncio
+from functools import partial
 
 load_dotenv()
 
@@ -27,6 +30,15 @@ def filter_sites(sites_list, cluster_data):
         print(f"Error filtering sites: {str(e)}")
         print("Returning all sites as fallback")
         return sites_list
+
+def process_site(ip_address: str, user_name: str, headers: dict, cluster_id: int, 
+                cluster_name: str, host_name: str) -> bool:
+    """
+    Wrapper function to run update_host in a separate process.
+    """
+    return asyncio.run(update_host(
+        ip_address, user_name, headers, cluster_id, cluster_name, host_name
+    ))
 
 async def init():
     """
@@ -54,37 +66,59 @@ async def init():
             print("No sites to process after filtering")
             return False
             
-        processes = []
-        
         # Get cluster details asynchronously
         try:
-            cluster_id = await xi.get_cluster_id_async()
-            cluster_name = await xi.get_cluster_name_async()
+            cluster_details = await asyncio.gather(
+                xi.get_cluster_id_async(),
+                xi.get_cluster_name_async()
+            )
+            cluster_id = cluster_details[0][0]  # Assuming it returns a list
+            cluster_name = cluster_details[1]
         except Exception as e:
             print(f"Error getting cluster details: {str(e)}")
-            # You might want to set default values here
-            cluster_id = [1]  # or whatever default makes sense
+            cluster_id = 1
             cluster_name = "default"
-        
-        # Start processes for each site
-        for site in filtered_sites:
-            ip_address = site["fields"]["ip_address"]
-            user_name = site["fields"]["username"]
-            host_name = site["fields"]["name"]
-            
-            print(f"Processing site: {host_name} ({ip_address})")
-            
-            p_process = Process(
-                target=update_host,
-                args=(ip_address, user_name, headers, cluster_id[0], cluster_name, host_name)
+
+        # Prepare site processing arguments
+        site_args = [
+            (
+                site["fields"]["ip_address"],
+                site["fields"]["username"],
+                headers,
+                cluster_id,
+                cluster_name,
+                site["fields"]["name"]
             )
-            p_process.start()
-            processes.append(p_process)
+            for site in filtered_sites
+        ]
+
+        # Create a ProcessPoolExecutor with a maximum number of workers
+        max_workers = min(len(site_args), os.cpu_count() or 4)
         
-        # Wait for all processes to finish
-        for process in processes:
-            process.join()
+        # Process sites in parallel using ProcessPoolExecutor
+        loop = asyncio.get_event_loop()
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            # Create tasks for each site
+            futures = [
+                loop.run_in_executor(
+                    executor,
+                    partial(process_site, *args)
+                )
+                for args in site_args
+            ]
             
+            # Wait for all tasks to complete and gather results
+            results = await asyncio.gather(*futures, return_exceptions=True)
+            
+            # Process results
+            for host_name, result in zip([site["fields"]["name"] for site in filtered_sites], results):
+                if isinstance(result, Exception):
+                    print(f"Error processing {host_name}: {str(result)}")
+                elif not result:
+                    print(f"Failed to update {host_name}")
+                else:
+                    print(f"Successfully updated {host_name}")
+                    
         return True
         
     except Exception as e:
