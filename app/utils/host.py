@@ -58,8 +58,15 @@ class SpinnerCls:
             sys.stdout.flush()
             time.sleep(0.01)
         self._print_count = 0
-        sys.stdout.write('\n')  # New line after dots
+        # sys.stdout.write('\n')  # New line after dots
         sys.stdout.flush()
+
+# def progress_wrapper(spinner: SpinnerCls, func: Def):
+#     spinner.start()
+#     result = await func()
+#     spinner.stop()
+#     return result
+
 
 async def update_remote_host(user_name: str, ip_address: str) -> str:
     def print_stage(message: str):
@@ -89,10 +96,16 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
         
         if isinstance(client, AsyncParamikoSSHClient):
             try:
+                spinner = SpinnerCls()
+
+                spinner.start()
                 await client.clsConnect()
+                spinner.stop()
+
                 print("##########################################")
                 print(f"Connect status: {client.is_connected()}")
                 print("##########################################")
+
                 if client.is_connected() == False:
                     client.close()
                     return 
@@ -106,7 +119,11 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
                     # Check if directory exists
                     print_action(f"Checking if directory exists: {app_dir}")
                     check_dir_cmd = f"[ -d {app_dir} ] && echo 'EXISTS' || echo 'NOT_EXISTS'"
+
+                    spinner.start()
                     dir_status = await client.send_command(check_dir_cmd)
+                    spinner.stop()
+
                     dir_status = dir_status.decode("utf-8").strip()
 
                     if dir_status == 'NOT_EXISTS':
@@ -117,13 +134,17 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
                         print_action(f"Cloning repository: {repo_name}")
                         git_clone_cmd = f"cd {parent_dir} && git clone http://{os.getenv('GIT_HOST')}:{generate_git_url(repo_name)}"
                         output_cache.append(f"Git Clone Command: {git_clone_cmd}")
+                        spinner.start()
                         stdout = await client.send_command(git_clone_cmd)
+                        spinner.stop()
                         try:
                             if "ERRor:" in stdout:
                                 error_output.append(stdout)
                                 print_status('error', f"Failed to clone repository: {repo_name}")
                             else:
                                 print_status('success', f"Repository cloned: {repo_name}")
+                                for line in stdout.decode('utf-8').splitlines():
+                                    output_cache.append(line)
                         except Exception as e:
                             decoded_stdout = stdout.decode("utf-8")
                             output_cache.append(f"Git Clone Output:\n{decoded_stdout}")
@@ -131,13 +152,19 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
                         print_action(f"Updating existing repository: {app_dir}")
                         git_pull_cmd = f"cd {app_dir} && git pull --tags http://{os.getenv('GIT_HOST')}:{generate_git_url(app_dir)}"
                         output_cache.append(f"Git Pull Command: {git_pull_cmd}")
+
+                        spinner.start()
                         stdout = await client.send_command(git_pull_cmd)
+                        spinner.stop()
+
                         try:
                             if "ERRor:" in stdout:
                                 error_output.append(stdout)
                                 print_status('error', f"Failed to pull updates for: {app_dir}")
                             else:
                                 print_status('success', f"Repository updated: {app_dir}")
+                                for line in stdout.decode('utf-8').splitlines():
+                                    output_cache.append(line)
                         except Exception as e:
                             decoded_stdout = stdout.decode("utf-8")
                             output_cache.append(f"Git Pull Output:\n{decoded_stdout}")
@@ -147,31 +174,48 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
                         print_action(f"Checking out tag: {tag}")
                         git_checkout_cmd = f"cd {app_dir} && git checkout {tag} -f"
                         output_cache.append(f"Git Checkout Command: {git_checkout_cmd}")
+
+                        spinner.start()
                         stdout = await client.send_command(git_checkout_cmd)
+                        spinner.stop()
+
                         try:
                             if "ERRor:" in stdout:
                                 error_output.append(stdout)
                                 print_status('error', f"Failed to checkout tag: {tag}")
                             else:
                                 print_status('success', f"Checked out tag: {tag}")
+                                for line in stdout.decode('utf-8').splitlines():
+                                    output_cache.append(line)
                         except Exception as e:
                             decoded_stdout = stdout.decode("utf-8")
                             output_cache.append(f"Git Checkout Output:\n{decoded_stdout}")
 
                         print_action("Updating HEAD reference")
                         git_describe_cmd = f"cd {app_dir} && git describe > HEAD"
+
+                        spinner.start()
                         stdout = await client.send_command(git_describe_cmd)
+                        spinner.stop()
+
                         try:
                             if "ERRor:" in stdout:
                                 error_output.append(stdout)
                                 print_status('error', "Failed to update HEAD reference")
+                            else:
+                                print_status('success', "Updated HEAD reference")
+                                for line in stdout.decode('utf-8').splitlines():
+                                    output_cache.append(line)
                         except Exception as e:
                             decoded_stdout = stdout.decode("utf-8")
                             output_cache.append(f"Git Describe write to head Output:\n{decoded_stdout}")
 
                         print_action("Getting current version")
                         git_describe_cmd = f"cd {app_dir} && git describe"
+
+                        spinner.start()
                         stdout = await client.send_command(git_describe_cmd)
+                        spinner.stop()
                         try:
                             if "ERRor:" in stdout:
                                 error_output.append(stdout)
@@ -179,6 +223,8 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
                             else:
                                 git_describe_decoded_stdout = stdout.decode("utf-8")
                                 print_status('success', f"Current version: {git_describe_decoded_stdout.strip()}")
+                                for line in stdout.decode('utf-8').splitlines():
+                                    output_cache.append(line)
                         except Exception as e:
                             git_describe_decoded_stdout = stdout.decode("utf-8")
                             output_cache.append(f"Git Describe Output:\n{git_describe_decoded_stdout}")
@@ -187,7 +233,7 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
                             collection.append(git_describe_decoded_stdout.strip())
 
                         if "BHT-EMR-API" in app_dir:
-                            spinner = SpinnerCls()
+                            
                             print_stage("SETTING UP BHT-EMR-API")
                             
                             print_action("Installing bundle dependencies")
@@ -198,49 +244,61 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
 
                             for bundle_path in bundle_dirs:
                                 print_action(f"Trying bundle installation with: {bundle_path}")
+
                                 spinner.start()
                                 bundle_install_cmd = f"cd {app_dir} && {bundle_path} install --local"
                                 stdout = await client.send_command(bundle_install_cmd)
+                                spinner.stop()
                                 try:
-                                    spinner.start()
+                                    spinner.stop()
                                     if "ERRor:" in stdout:
                                         error_output.append(stdout)
                                         print_status('error', f"Bundle installation failed with: {bundle_path}")
                                     else:
                                         print_status('success', f"Bundle installation completed with: {bundle_path}")
+                                        for line in stdout.decode('utf-8').splitlines():
+                                            output_cache.append(line)
                                 except Exception as e:
-                                    spinner.start()
+                                    spinner.stop()
                                     for line in stdout.decode('utf-8').splitlines():
                                         output_cache.append(line)
-
-                            spinner.stop()
-
                                     
                             print_action("Running database migrations")
+
+                            spinner.start()
                             ruby_dirs = await find_ruby(client=client)
+                            spinner.stop()
                             for ruby_path in ruby_dirs:
                                 print_action(f"Attempting migration with: {ruby_path}")
                                 migration_cmd = f"cd {app_dir} && {ruby_path} bin/rails db:migrate"
+                                spinner.start()
                                 stdout = await client.send_command(migration_cmd)
+                                spinner.stop()
                                 try:
                                     if "ERRor:" in stdout:
                                         error_output.append(stdout)
                                         print_status('error', f"Migration failed with: {ruby_path}")
                                     else:
                                         print_status('success', f"Migration completed with: {ruby_path}")
+                                        for line in stdout.decode('utf-8').splitlines():
+                                            output_cache.append(line)
                                 except Exception as e:
                                     for line in stdout.decode('utf-8').splitlines():
                                         output_cache.append(line)
                             
                             print_action("Uploading metadata")
                             load_metadata_cmd = f"cd {app_dir} && cd bin/ && ./update_art_metadata.sh development"
+                            spinner.start()
                             stdout = await client.send_command(load_metadata_cmd)
+                            spinner.stop()
                             try:
                                 if "ERRor:" in stdout:
                                     error_output.append(stdout)
                                     print_status('error', "Metadata upload failed")
                                 else:
                                     print_status('success', "Metadata upload completed")
+                                    for line in stdout.decode('utf-8').splitlines():
+                                        output_cache.append(line)
                             except Exception as e:
                                 for line in stdout.decode('utf-8').splitlines():
                                     output_cache.append(line)
@@ -251,69 +309,100 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
                 redisPassword = await redisInstance.getPswrd(ip_address)
                 print_action("Reloading Nginx")
                 reload_nginx_cmd = "systemctl reload nginx"
+                spinner.start()
                 reload_nginx_output = await client.send_sudo_command(redisPassword, reload_nginx_cmd)
+                spinner.stop()
                 try:
+                    spinner.stop()
                     if "ERRor:" in reload_nginx_output:
                         error_output.append(reload_nginx_output)
                         print_status('error', "Failed to reload Nginx")
                     else:
                         print_status('success', "Nginx reloaded")
+                        decoded_reload_nginx_output = reload_nginx_output.decode("utf-8")
+                        output_cache.append(f"Nginx Reload Output:\n{decoded_reload_nginx_output}")
                 except Exception as e:
+                    spinner.stop()
                     decoded_reload_nginx_output = reload_nginx_output.decode("utf-8")
                     output_cache.append(f"Nginx Reload Output:\n{decoded_reload_nginx_output}")
 
                 print_action("Checking Nginx status")
                 status_nginx_cmd = "systemctl status nginx"
+                spinner.start()
                 status_nginx_output = await client.send_sudo_command(redisPassword, status_nginx_cmd)
+                spinner.stop()
                 try:
+                    spinner.stop()
                     if "ERRor:" in status_nginx_output:
                         error_output.append(status_nginx_output)
                         print_status('error', "Failed to get Nginx status")
                     else:
                         print_status('success', "Nginx is running")
+                        decoded_status_nginx_output = status_nginx_output.decode("utf-8")
+                        output_cache.append(f"Nginx Status Output:\n{decoded_status_nginx_output}")
                 except Exception as e:
+                    spinner.stop()
                     decoded_status_nginx_output = status_nginx_output.decode("utf-8")
                     output_cache.append(f"Nginx Status Output:\n{decoded_status_nginx_output}")
                 
                 print_action("Stopping Puma")
                 stop_puma_cmd = "systemctl stop puma"
+                spinner.start()
                 stop_puma_output = await client.send_sudo_command(redisPassword, stop_puma_cmd)
+                spinner.stop()
                 try:
+                    spinner.stop()
                     if "ERRor:" in stop_puma_output:
                         error_output.append(stop_puma_output)
                         print_status('error', "Failed to stop Puma")
                     else:
                         print_status('success', "Puma stopped")
+                        decoded_stop_puma_output = stop_puma_output.decode("utf-8")
+                        output_cache.append(f"Puma Stop Output:\n{decoded_stop_puma_output}")
                 except Exception as e:
+                    spinner.stop()
                     decoded_stop_puma_output = stop_puma_output.decode("utf-8")
                     output_cache.append(f"Puma Stop Output:\n{decoded_stop_puma_output}")
                 
                 print_action("Starting Puma")
                 start_puma_cmd = "systemctl start puma"
+                spinner.start()
                 start_puma_output = await client.send_sudo_command(redisPassword, start_puma_cmd)
+                spinner.stop()
                 try:
+                    spinner.stop()
                     if "ERRor:" in start_puma_output:
                         error_output.append(start_puma_output)
                         print_status('error', "Failed to start Puma")
                     else:
                         print_status('success', "Puma started")
+                        decoded_start_puma_output = start_puma_output.decode("utf-8")
+                        output_cache.append(f"Puma Start Output:\n{decoded_start_puma_output}")
                 except Exception as e:
+                    spinner.stop()
                     decoded_start_puma_output = start_puma_output.decode("utf-8")
                     output_cache.append(f"Puma Start Output:\n{decoded_start_puma_output}")
 
                 print_action("Checking Puma status")
                 status_puma_cmd = "systemctl status puma"
+                spinner.start()
                 status_puma_output = await client.send_sudo_command(redisPassword, status_puma_cmd)
+                spinner.stop()
                 try:
+                    spinner.stop()
                     if "ERRor:" in status_puma_output:
                         error_output.append(status_puma_output)
                         print_status('error', "Failed to get Puma status")
                     else:
                         print_status('success', "Puma is running")
+                        decoded_status_puma_output = status_puma_output.decode("utf-8")
+                        output_cache.append(f"Puma Status Output:\n{decoded_status_puma_output}")
                 except Exception as e:
+                    spinner.stop()
                     decoded_status_puma_output = status_puma_output.decode("utf-8")
                     output_cache.append(f"Puma Status Output:\n{decoded_status_puma_output}")
 
+                spinner.stop()
                 print_action("Closing connection")
                 client.close()
                 print_status('success', "Connection closed")
@@ -329,6 +418,8 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
                 return _data_
             
             except Exception as e:
+                client.close()
+                spinner.stop()
                 print_status('error', f"Deployment failed: {str(e)}")
                 return {"error": str(e)}
 

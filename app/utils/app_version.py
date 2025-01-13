@@ -1,11 +1,15 @@
 apps = [
         {
             "app_name": "BHT-EMR-API",
-            "app_version": "v4.18.0"
+            "app_version": "v5.3.3"
         },
         {
             "app_name": "HIS-Core",
-            "app_version": "v1.11.0"
+            "app_version": "v2024.Q3.R7"
+        },
+        {
+            "app_name": "HIS-Core-release",
+            "app_version": "v2024.Q3.R7"
         },
     ]
 
