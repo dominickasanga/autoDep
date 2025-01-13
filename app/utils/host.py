@@ -2,13 +2,16 @@ from curses import echo
 import re
 import paramiko
 import os
+import sys
 import asyncio
+import threading
+import itertools
+import time
 from .net import AsyncParamikoSSHClient, RedisCls
 from .app_version import getTag, generate_git_url
 from .remote_exec_app import find_bundle_dir, find_ruby
 from dotenv import load_dotenv
 load_dotenv()
-import itertools
 
 _PASSWORDS_ = os.getenv('PASSWORDS')
 passwords = _PASSWORDS_.split(',')
@@ -18,11 +21,46 @@ password_list = [password.strip("['").strip("']") for password in passwords]
 password_list = [password.replace("'", "").strip("")
                  for password in password_list]
 
-async def spinner():
-    for frame in itertools.cycle(['|', '/', '-', '\\']):
-        print(f"\rProcessing... {frame}", end='', flush=True)
-        await asyncio.sleep(0.1)  # Adjust the speed as needed
+class SpinnerCls:
+    def __init__(self):
+        self.isRunning = False
+        self._print_count = 0
+        self._thread = None
+        self.spinner = itertools.cycle(['|', '/', '-', '\\'])
+    
+    def _spin(self):
+        while self.isRunning:
+            frame = next(self.spinner)  # Get the frame once
+            sys.stdout.write(frame)
+            sys.stdout.flush()
+            time.sleep(0.2)
+            self._print_count += 1
+
+            # sys.stdout.write('\b')  # Only need to erase one character
+    
+    def start(self):
+        """Start the spinner animation in a separate thread"""
+        if not self.isRunning:
+            self.isRunning = True
+            self._thread = threading.Thread(target=self._spin)
+            self._thread.start()
+    
+    def stop(self):
+        """Stop the spinner animation and print 100 dots"""
+        self.isRunning = False
+        if self._thread is not None:
+            self._thread.join()
+        sys.stdout.write('\r')  # Clear the line
         
+        # Print 100 dots with a small delay for visual effect
+        for _ in range(self._print_count):
+            sys.stdout.write('.')
+            sys.stdout.flush()
+            time.sleep(0.01)
+        self._print_count = 0
+        sys.stdout.write('\n')  # New line after dots
+        sys.stdout.flush()
+
 async def update_remote_host(user_name: str, ip_address: str) -> str:
     def print_stage(message: str):
         print(f"\n{'='*80}\n{message}\n{'='*80}")
@@ -153,33 +191,32 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
                             collection.append(git_describe_decoded_stdout.strip())
 
                         if "BHT-EMR-API" in app_dir:
+                            spinner = SpinnerCls()
                             print_stage("SETTING UP BHT-EMR-API")
                             
                             print_action("Installing bundle dependencies")
+
+                            spinner.start()
                             bundle_dirs = await find_bundle_dir(client=client)
+                            spinner.stop()
+
                             for bundle_path in bundle_dirs:
                                 if "3.2.0" in bundle_path:  # Only consider paths containing "3.2.0"
                                     print_action(f"Trying bundle installation with: {bundle_path}")
+                                    spinner.start()
                                     bundle_install_cmd = f"cd {app_dir} && {bundle_path} install --local"
-
-                                    # Start spinner in the background
-                                    spinner_task = asyncio.create_task(spinner())
-
+                                    stdout = await client.send_command(bundle_install_cmd)
                                     try:
-                                        stdout = await client.send_command(bundle_install_cmd)
-                                        spinner_task.cancel()  # Stop the spinner once the command completes
-
+                                        spinner.start()
                                         if "ERRor:" in stdout:
                                             error_output.append(stdout)
                                             print_status('error', f"Bundle installation failed with: {bundle_path}")
                                         else:
                                             print_status('success', f"Bundle installation completed with: {bundle_path}")
                                     except Exception as e:
-                                        spinner_task.cancel()  # Ensure spinner is stopped in case of an error
+                                        spinner.start()
                                         for line in stdout.decode('utf-8').splitlines():
                                             output_cache.append(line)
-                                    finally:
-                                        print("\r" + " " * 20, end="\r")  # Clear the spinner line
 
                                     
                             print_action("Running database migrations")
