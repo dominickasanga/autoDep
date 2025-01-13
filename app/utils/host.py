@@ -201,22 +201,23 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
                             spinner.stop()
 
                             for bundle_path in bundle_dirs:
-                                if "3.2.0" in bundle_path:  # Only consider paths containing "3.2.0"
-                                    print_action(f"Trying bundle installation with: {bundle_path}")
+                                print_action(f"Trying bundle installation with: {bundle_path}")
+                                spinner.start()
+                                bundle_install_cmd = f"cd {app_dir} && {bundle_path} install --local"
+                                stdout = await client.send_command(bundle_install_cmd)
+                                try:
                                     spinner.start()
-                                    bundle_install_cmd = f"cd {app_dir} && {bundle_path} install --local"
-                                    stdout = await client.send_command(bundle_install_cmd)
-                                    try:
-                                        spinner.start()
-                                        if "ERRor:" in stdout:
-                                            error_output.append(stdout)
-                                            print_status('error', f"Bundle installation failed with: {bundle_path}")
-                                        else:
-                                            print_status('success', f"Bundle installation completed with: {bundle_path}")
-                                    except Exception as e:
-                                        spinner.start()
-                                        for line in stdout.decode('utf-8').splitlines():
-                                            output_cache.append(line)
+                                    if "ERRor:" in stdout:
+                                        error_output.append(stdout)
+                                        print_status('error', f"Bundle installation failed with: {bundle_path}")
+                                    else:
+                                        print_status('success', f"Bundle installation completed with: {bundle_path}")
+                                except Exception as e:
+                                    spinner.start()
+                                    for line in stdout.decode('utf-8').splitlines():
+                                        output_cache.append(line)
+
+                            spinner.stop()
 
                                     
                             print_action("Running database migrations")
