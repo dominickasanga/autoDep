@@ -58,9 +58,9 @@ class AsyncParamikoSSHClient(paramiko.SSHClient):
             # Check common key locations
             key_paths = [
                 ("~/.ssh/id_rsa", paramiko.RSAKey),
-                ("~/.ssh/id_ed25519", paramiko.Ed25519Key),
-                ("~/.ssh/id_ecdsa", paramiko.ECDSAKey),
-                ("~/.ssh/id_dsa", paramiko.DSSKey)
+                # ("~/.ssh/id_ed25519", paramiko.Ed25519Key),
+                # ("~/.ssh/id_ecdsa", paramiko.ECDSAKey),
+                # ("~/.ssh/id_dsa", paramiko.DSSKey)
             ]
             
             # Override with environment variable if set
