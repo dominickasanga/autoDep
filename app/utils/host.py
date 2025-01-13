@@ -8,6 +8,7 @@ from .app_version import getTag, generate_git_url
 from .remote_exec_app import find_bundle_dir, find_ruby
 from dotenv import load_dotenv
 load_dotenv()
+import itertools
 
 _PASSWORDS_ = os.getenv('PASSWORDS')
 passwords = _PASSWORDS_.split(',')
@@ -17,6 +18,11 @@ password_list = [password.strip("['").strip("']") for password in passwords]
 password_list = [password.replace("'", "").strip("")
                  for password in password_list]
 
+async def spinner():
+    for frame in itertools.cycle(['|', '/', '-', '\\']):
+        print(f"\rProcessing... {frame}", end='', flush=True)
+        await asyncio.sleep(0.1)  # Adjust the speed as needed
+        
 async def update_remote_host(user_name: str, ip_address: str) -> str:
     def print_stage(message: str):
         print(f"\n{'='*80}\n{message}\n{'='*80}")
@@ -155,16 +161,25 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
                                 if "3.2.0" in bundle_path:  # Only consider paths containing "3.2.0"
                                     print_action(f"Trying bundle installation with: {bundle_path}")
                                     bundle_install_cmd = f"cd {app_dir} && {bundle_path} install --local"
-                                    stdout = await client.send_command(bundle_install_cmd)
+
+                                    # Start spinner in the background
+                                    spinner_task = asyncio.create_task(spinner())
+
                                     try:
+                                        stdout = await client.send_command(bundle_install_cmd)
+                                        spinner_task.cancel()  # Stop the spinner once the command completes
+
                                         if "ERRor:" in stdout:
                                             error_output.append(stdout)
                                             print_status('error', f"Bundle installation failed with: {bundle_path}")
                                         else:
                                             print_status('success', f"Bundle installation completed with: {bundle_path}")
                                     except Exception as e:
+                                        spinner_task.cancel()  # Ensure spinner is stopped in case of an error
                                         for line in stdout.decode('utf-8').splitlines():
                                             output_cache.append(line)
+                                    finally:
+                                        print("\r" + " " * 20, end="\r")  # Clear the spinner line
 
                                     
                             print_action("Running database migrations")
