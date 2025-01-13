@@ -62,6 +62,8 @@ class AsyncParamikoSSHClient(paramiko.SSHClient):
                 # ("~/.ssh/id_ecdsa", paramiko.ECDSAKey),
                 # ("~/.ssh/id_dsa", paramiko.DSSKey)
             ]
+
+            print(f"Attempting connection to {host} with key at ~/.ssh/id_rsa")
             
             # Override with environment variable if set
             if "SSH_PRIVATE_KEY_PATH" in os.environ:
