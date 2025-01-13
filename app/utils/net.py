@@ -54,6 +54,9 @@ class AsyncParamikoSSHClient(paramiko.SSHClient):
         try:
             self.load_system_host_keys()
             self.set_missing_host_key_policy(paramiko.WarningPolicy())
+
+            print(f"Attempting connection to {host} with key at ~/.ssh/id_rsa")
+
             
             # Check common key locations
             key_paths = [
