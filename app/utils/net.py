@@ -52,6 +52,7 @@ class AsyncParamikoSSHClient(paramiko.SSHClient):
 
     def _connect_key_based(self, host, username):
         try:
+            print("in connect sub routine")
             self.load_system_host_keys()
             self.set_missing_host_key_policy(paramiko.WarningPolicy())
 
