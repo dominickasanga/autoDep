@@ -34,7 +34,7 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
 
     try:
         print_stage("INITIALIZING DEPLOYMENT")
-        print_action(f"Connecting to remote host: {user_name}{'@'}{ip_address}")
+        print_action(f"Connecting to remote host: {ip_address}")
         
         client = await conect_to_remote_host(ip_address, user_name)
         app_dirs = os.getenv('APP_DIRS').split(',')
@@ -46,6 +46,9 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
         if isinstance(client, AsyncParamikoSSHClient):
             try:
                 await client.clsConnect()
+                print("##########################################")
+                print(f"Connect status: {client.is_connected()}")
+                print("##########################################")
                 if client.is_connected() == False:
                     client.close()
                     return 
