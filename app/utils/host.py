@@ -152,18 +152,20 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
                             print_action("Installing bundle dependencies")
                             bundle_dirs = await find_bundle_dir(client=client)
                             for bundle_path in bundle_dirs:
-                                print_action(f"Trying bundle installation with: {bundle_path}")
-                                bundle_install_cmd = f"cd {app_dir} && {bundle_path} install --local"
-                                stdout = await client.send_command(bundle_install_cmd)
-                                try:
-                                    if "ERRor:" in stdout:
-                                        error_output.append(stdout)
-                                        print_status('error', f"Bundle installation failed with: {bundle_path}")
-                                    else:
-                                        print_status('success', f"Bundle installation completed with: {bundle_path}")
-                                except Exception as e:
-                                    for line in stdout.decode('utf-8').splitlines():
-                                        output_cache.append(line)
+                                if "3.2.0" in bundle_path:  # Only consider paths containing "3.2.0"
+                                    print_action(f"Trying bundle installation with: {bundle_path}")
+                                    bundle_install_cmd = f"cd {app_dir} && {bundle_path} install --local"
+                                    stdout = await client.send_command(bundle_install_cmd)
+                                    try:
+                                        if "ERRor:" in stdout:
+                                            error_output.append(stdout)
+                                            print_status('error', f"Bundle installation failed with: {bundle_path}")
+                                        else:
+                                            print_status('success', f"Bundle installation completed with: {bundle_path}")
+                                    except Exception as e:
+                                        for line in stdout.decode('utf-8').splitlines():
+                                            output_cache.append(line)
+
                                     
                             print_action("Running database migrations")
                             ruby_dirs = await find_ruby(client=client)
