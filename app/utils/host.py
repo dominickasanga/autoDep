@@ -114,10 +114,6 @@ async def update_remote_host(user_name: str, ip_address: str) -> str:
                         parent_dir = os.path.dirname(app_dir)
                         repo_name = os.path.basename(app_dir)
                         
-                        print_action(f"Creating directory: {parent_dir}")
-                        mkdir_cmd = f"mkdir -p {parent_dir}"
-                        await client.send_command(mkdir_cmd)
-                        
                         print_action(f"Cloning repository: {repo_name}")
                         git_clone_cmd = f"cd {parent_dir} && git clone http://{os.getenv('GIT_HOST')}:{generate_git_url(repo_name)}"
                         output_cache.append(f"Git Clone Command: {git_clone_cmd}")
