@@ -54,6 +54,8 @@ class AsyncParamikoSSHClient(paramiko.SSHClient):
         try:
             print("in connect sub routine")
             self.load_system_host_keys()
+
+            print("in connect sub routine 2222222222222222222")
             self.set_missing_host_key_policy(paramiko.WarningPolicy())
 
             print(f"Attempting connection to {host} with key at ~/.ssh/id_rsa")
