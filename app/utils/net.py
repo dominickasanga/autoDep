@@ -52,24 +52,16 @@ class AsyncParamikoSSHClient(paramiko.SSHClient):
 
     def _connect_key_based(self, host, username):
         try:
-            print("in connect sub routine")
             self.load_system_host_keys()
-
-            print("in connect sub routine 2222222222222222222")
             self.set_missing_host_key_policy(paramiko.WarningPolicy())
-
-            print(f"Attempting connection to {host} with key at ~/.ssh/id_rsa")
-
             
             # Check common key locations
             key_paths = [
                 ("~/.ssh/id_rsa", paramiko.RSAKey),
-                # ("~/.ssh/id_ed25519", paramiko.Ed25519Key),
-                # ("~/.ssh/id_ecdsa", paramiko.ECDSAKey),
-                # ("~/.ssh/id_dsa", paramiko.DSSKey)
+                ("~/.ssh/id_ed25519", paramiko.Ed25519Key),
+                ("~/.ssh/id_ecdsa", paramiko.ECDSAKey),
+                ("~/.ssh/id_dsa", paramiko.DSSKey)
             ]
-
-            print(f"Attempting connection to {host} with key at ~/.ssh/id_rsa")
             
             # Override with environment variable if set
             if "SSH_PRIVATE_KEY_PATH" in os.environ:
